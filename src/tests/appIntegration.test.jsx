@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import 'fake-indexeddb/auto';
 import App from '../App.jsx';
 
@@ -26,13 +26,14 @@ describe('App End-to-End User Flow Integration', () => {
     expect(screen.getByText('Ready — Starts on First Keypress')).toBeDefined();
     expect(screen.getByText('15:00')).toBeDefined(); // Timer starts at 15:00
     expect(screen.getByText('Total Key Depressions')).toBeDefined();
-    expect(screen.getByText('Typing Progress')).toBeDefined();
+    // Typing Progress card must be REMOVED as requested
+    expect(screen.queryByText('Typing Progress')).toBeNull();
 
-    // Reference passage is rendered
+    // Reference passage is rendered and has AT LEAST 4,000 characters
     const passageBox = document.querySelector('.passage-display-box');
     expect(passageBox).toBeDefined();
     const chars = passageBox.querySelectorAll('.char');
-    expect(chars.length).toBeGreaterThan(500);
+    expect(chars.length).toBeGreaterThanOrEqual(4000);
 
     // Initial character status
     expect(chars[0].className).toContain('char-current');
@@ -99,9 +100,11 @@ describe('App End-to-End User Flow Integration', () => {
     expect(resultsHeader).toBeDefined();
     expect(screen.getByText('Typing Speed (WPM)')).toBeDefined();
     expect(screen.getByText('Total Key Depressions')).toBeDefined();
-    expect(screen.getByText('Typing Error Percentage')).toBeDefined();
+    expect(screen.getByText('Error Percentage')).toBeDefined();
+    expect(screen.getByText('Accuracy Percentage')).toBeDefined();
+    expect(screen.getByText('Incorrect Key Breakdown')).toBeDefined();
 
-    // Ensure NO unnecessary statistics, charts, or mistake lists are displayed
+    // Ensure NO unnecessary statistics, charts, or recommendations are displayed
     expect(screen.queryByText(/Mistakes List/i)).toBeNull();
     expect(screen.queryByText(/Accuracy Breakdown/i)).toBeNull();
     expect(screen.queryByText(/Suggestions/i)).toBeNull();

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateWPM,
   calculateErrorPercentage,
+  calculateAccuracyPercentage,
+  extractIncorrectKeyBreakdown,
   isTypingKey,
   formatTime
 } from '../engine/calculations.js';
@@ -33,7 +35,7 @@ describe('Calculations Module', () => {
     });
   });
 
-  describe('calculateErrorPercentage', () => {
+  describe('calculateErrorPercentage and calculateAccuracyPercentage', () => {
     it('calculates percentage of incorrect attempts relative to total attempts', () => {
       // 20 mistakes out of 1000 total attempts = 2%
       expect(calculateErrorPercentage(20, 1000)).toBe(2);
@@ -43,10 +45,46 @@ describe('Calculations Module', () => {
       expect(calculateErrorPercentage(7, 231)).toBe(3.03);
     });
 
+    it('calculates accuracy percentage accurately as 100 - error percentage', () => {
+      expect(calculateAccuracyPercentage(2)).toBe(98);
+      expect(calculateAccuracyPercentage(3.03)).toBe(96.97);
+      expect(calculateAccuracyPercentage(0)).toBe(100);
+      expect(calculateAccuracyPercentage(100)).toBe(0);
+      expect(calculateAccuracyPercentage(105)).toBe(0); // clamped at 0
+    });
+
     it('handles zero attempts or zero mistakes safely', () => {
       expect(calculateErrorPercentage(0, 500)).toBe(0);
       expect(calculateErrorPercentage(5, 0)).toBe(0);
       expect(calculateErrorPercentage(0, 0)).toBe(0);
+      expect(calculateAccuracyPercentage(0)).toBe(100);
+    });
+  });
+
+  describe('extractIncorrectKeyBreakdown', () => {
+    it('extracts and sorts incorrect keys by error frequency descending', () => {
+      const mockMistakes = [
+        { expectedChar: 'a' },
+        { expectedChar: 'e' },
+        { expectedChar: 'a' },
+        { expectedChar: 'a' },
+        { expectedChar: 'r' },
+        { expectedChar: 'e' },
+        { expectedChar: ' ' }
+      ];
+
+      const breakdown = extractIncorrectKeyBreakdown(mockMistakes);
+      expect(breakdown).toEqual([
+        { key: 'a', count: 3 },
+        { key: 'e', count: 2 },
+        { key: 'r', count: 1 },
+        { key: 'Space', count: 1 }
+      ]);
+    });
+
+    it('returns empty array when there are no mistakes', () => {
+      expect(extractIncorrectKeyBreakdown([])).toEqual([]);
+      expect(extractIncorrectKeyBreakdown(null)).toEqual([]);
     });
   });
 
@@ -61,8 +99,9 @@ describe('Calculations Module', () => {
       expect(isTypingKey({ key: '-' })).toBe(true);
     });
 
-    it('accepts Backspace as an active correction key depression', () => {
+    it('accepts Backspace and Enter as valid typing keys', () => {
       expect(isTypingKey({ key: 'Backspace' })).toBe(true);
+      expect(isTypingKey({ key: 'Enter' })).toBe(true);
     });
 
     it('rejects modifier keys and control navigation keys', () => {

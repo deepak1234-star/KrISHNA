@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TypingEngine } from '../engine/typingEngine.js';
 import { TestTimer } from '../engine/timer.js';
-import { formatTime, isTypingKey } from '../engine/calculations.js';
+import {
+  formatTime,
+  isTypingKey,
+  calculateAccuracyPercentage,
+  extractIncorrectKeyBreakdown
+} from '../engine/calculations.js';
 import { saveCompletedTest } from '../storage/mistakeRepository.js';
 
 const TEST_DURATION_SECONDS = 900; // 15 Minutes exactly
@@ -26,6 +31,7 @@ export default function TypingTest({
   const timerRef = useRef(null);
   const isFinishedRef = useRef(false);
   const hasStartedRef = useRef(false);
+  const lastActiveLineTopRef = useRef(-1);
 
   // Starts the countdown timer on candidate's first typing action
   const startTimerIfNeeded = useCallback(() => {
@@ -59,6 +65,14 @@ export default function TypingTest({
     // Ensure duration is non-zero (minimum 1 second for calculations if finished immediately)
     const validElapsed = Math.max(1, finalElapsed);
     const metrics = engine.getMetrics(validElapsed);
+    const accuracyPercentage = calculateAccuracyPercentage(metrics.errorPercentage);
+    const incorrectKeysBreakdown = extractIncorrectKeyBreakdown(engine.mistakes);
+
+    const fullResults = {
+      ...metrics,
+      accuracyPercentage,
+      incorrectKeysBreakdown
+    };
 
     const testSummary = {
       id: engine.testId,
@@ -67,6 +81,7 @@ export default function TypingTest({
       keyDepressions: metrics.totalKeyDepressions,
       wpm: metrics.wpm,
       errorPercentage: metrics.errorPercentage,
+      accuracyPercentage,
       correctCharacters: metrics.correctCharacters,
       totalMistakes: engine.mistakes.length,
       totalAttempts: engine.totalCharacterAttempts
@@ -74,7 +89,7 @@ export default function TypingTest({
 
     // Immediately transition to Result Page
     if (onFinishTestRef.current) {
-      onFinishTestRef.current(metrics);
+      onFinishTestRef.current(fullResults);
     }
 
     // Background silent save to IndexedDB without blocking UI
@@ -121,25 +136,28 @@ export default function TypingTest({
     };
   }, []); // Empty dependency array ensures timer runs uninterrupted across re-renders!
 
-  // Auto-scroll reference passage to keep active character aligned
+  // Auto-scroll reference passage stably when line changes
   useEffect(() => {
-    if (activeCharRef.current && passageBoxRef.current) {
-      const activeEl = activeCharRef.current;
-      const box = passageBoxRef.current;
-      
-      const charTop = activeEl.offsetTop;
-      const boxHeight = box.clientHeight;
-      // Keep active line roughly 40-50px from top of viewport
-      const targetScroll = Math.max(0, charTop - (boxHeight / 3));
+    if (!activeCharRef.current || !passageBoxRef.current) return;
+    const activeEl = activeCharRef.current;
+    const box = passageBoxRef.current;
 
-      if (typeof box.scrollTo === 'function') {
-        box.scrollTo({
-          top: targetScroll,
-          behavior: 'auto'
-        });
-      } else {
-        box.scrollTop = targetScroll;
-      }
+    const charTop = activeEl.offsetTop;
+    // If the active character is still on the same vertical line, do not touch scroll!
+    if (lastActiveLineTopRef.current >= 0 && Math.abs(charTop - lastActiveLineTopRef.current) < 4) {
+      return;
+    }
+    lastActiveLineTopRef.current = charTop;
+
+    const boxHeight = box.clientHeight;
+    const currentScroll = box.scrollTop;
+    const relativePosition = charTop - currentScroll;
+
+    // Only scroll if the new line falls into the lower half of the box
+    if (relativePosition > boxHeight * 0.55) {
+      box.scrollTop = Math.max(0, charTop - Math.floor(boxHeight * 0.25));
+    } else if (relativePosition < 0) {
+      box.scrollTop = Math.max(0, charTop - 10);
     }
   }, [typedLength]);
 
@@ -223,10 +241,6 @@ export default function TypingTest({
     }
   };
 
-  const progressPercentage = engine.passage.length > 0
-    ? Math.min(100, Number(((typedLength / engine.passage.length) * 100).toFixed(1)))
-    : 0;
-
   return (
     <div className="test-page" onClick={handleContainerClick}>
       {/* SSC CGL Exam Header */}
@@ -237,7 +251,7 @@ export default function TypingTest({
         </span>
       </div>
 
-      {/* Top Metrics Section */}
+      {/* Top Metrics Section: Kept ONLY Time Remaining and Total Key Depressions */}
       <div className="metrics-bar">
         <div className="metric-card">
           <span className="metric-label">Time Remaining</span>
@@ -252,24 +266,17 @@ export default function TypingTest({
             {keyDepressions.toLocaleString()}
           </span>
         </div>
-
-        <div className="metric-card">
-          <span className="metric-label">Typing Progress</span>
-          <span className="metric-value">
-            {progressPercentage}%
-          </span>
-        </div>
       </div>
 
-      {/* Reference Passage with Character-by-Character Styling */}
+      {/* Reference Passage with Completely Stable Character Styling */}
       <div className="passage-section">
         <div className="section-label">Reference Passage</div>
         <div className="passage-display-box" ref={passageBoxRef}>
           {engine.passage.split('').map((char, index) => {
             const status = engine.getCharacterStatus(index);
             const isCurrent = status === 'current';
-            const isSpace = char === ' ' || char === '\n';
-            
+            const isSpace = char === ' ';
+
             let className = `char char-${status}`;
             if (isSpace) {
               className += ' char-space';
@@ -281,7 +288,7 @@ export default function TypingTest({
                 ref={isCurrent ? activeCharRef : null}
                 className={className}
               >
-                {char === '\n' ? '↵ ' : char}
+                {char}
               </span>
             );
           })}

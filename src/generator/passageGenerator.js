@@ -1,6 +1,8 @@
 import { THEMATIC_SECTIONS } from './passageCorpus.js';
 import { computePassageFingerprint } from './fingerprint.js';
 
+const MIN_REQUIRED_CHARS = 4000; // Guaranteed minimum 4,000 actual characters
+
 /**
  * Counts occurrences of a substring in a text (case-insensitive).
  */
@@ -58,19 +60,23 @@ export function scoreSentenceForPatterns(sentence, patterns = {}) {
 }
 
 /**
- * Generates an adaptive, natural, and unique passage for the SSC CGL DEST typing test.
+ * Generates an adaptive, natural, and unique passage of AT LEAST 4,000 characters
+ * for the 15-minute SSC CGL DEST typing test.
  * 
  * @param {object} options
  * @param {object} [options.historicalPatterns] - Cumulative patterns from IndexedDB
  * @param {Set<string>} [options.pastFingerprints] - Hashes of past generated passages
- * @param {number} [options.targetCharCount=2100] - Standard SSC CGL length (around 2000-2400 chars)
+ * @param {number} [options.targetCharCount=4200] - Guaranteed at least 4,000 characters
  * @returns {{ passage: string, targetPatterns: Array<string>, fingerprint: string }}
  */
 export function generateAdaptivePassage({
   historicalPatterns = {},
   pastFingerprints = new Set(),
-  targetCharCount = 2200
+  targetCharCount = 4200
 } = {}) {
+  // Ensure target is at least 4,000 characters
+  const effectiveTarget = Math.max(MIN_REQUIRED_CHARS, targetCharCount);
+
   const hasHistory = (
     (historicalPatterns.topChars && historicalPatterns.topChars.length > 0) ||
     (historicalPatterns.topBigrams && historicalPatterns.topBigrams.length > 0) ||
@@ -104,44 +110,53 @@ export function generateAdaptivePassage({
   let bestFingerprint = '';
 
   for (let attempt = 0; attempt < 10; attempt++) {
-    // Select 3 or 4 distinct thematic sections for paragraph variety
-    const chosenThemes = shuffle(THEMATIC_SECTIONS).slice(0, 3);
-    const paragraphs = [];
+    const selectedSentences = [];
     let currentLength = 0;
 
-    for (const section of chosenThemes) {
-      let pool = [...section.sentences];
+    // Collect all candidate sentences across shuffled themes
+    const shuffledThemes = shuffle(THEMATIC_SECTIONS);
+    
+    // Continue cycling through themes until we exceed effectiveTarget (>= 4,000 chars)
+    let themeIndex = 0;
+    while (currentLength < effectiveTarget) {
+      const section = shuffledThemes[themeIndex % shuffledThemes.length];
+      const pool = [...section.sentences];
 
       if (hasHistory) {
         // Score each sentence against the target patterns
         const scored = pool.map(s => ({
           sentence: s,
-          score: scoreSentenceForPatterns(s, historicalPatterns) + (Math.random() * 2) // slight jitter for variety
+          score: scoreSentenceForPatterns(s, historicalPatterns) + (Math.random() * 2)
         }));
 
         // Sort descending by score
         scored.sort((a, b) => b.score - a.score);
 
         // Mix: take 2 highest scoring sentences (high pattern exposure)
-        // and 1-2 moderate or random sentences (natural text balance)
+        // and 2 balanced sentences (natural text flow)
         const topSentences = scored.slice(0, 2).map(item => item.sentence);
         const remaining = shuffle(scored.slice(2).map(item => item.sentence));
-        const selected = [...topSentences, ...remaining.slice(0, 2)];
+        const picked = [...topSentences, ...remaining.slice(0, 2)];
 
-        paragraphs.push(shuffle(selected).join(' '));
+        for (const s of shuffle(picked)) {
+          selectedSentences.push(s);
+          currentLength += s.length + 1; // +1 for space
+          if (currentLength >= effectiveTarget) break;
+        }
       } else {
         // Balanced random selection for new user
-        const selected = shuffle(pool).slice(0, 4);
-        paragraphs.push(selected.join(' '));
+        const picked = shuffle(pool).slice(0, 4);
+        for (const s of picked) {
+          selectedSentences.push(s);
+          currentLength += s.length + 1;
+          if (currentLength >= effectiveTarget) break;
+        }
       }
 
-      currentLength = paragraphs.join(' ').length;
-      if (currentLength >= targetCharCount) {
-        break;
-      }
+      themeIndex++;
     }
 
-    const candidatePassage = paragraphs.join(' ').replace(/\s+/g, ' ').trim();
+    const candidatePassage = selectedSentences.join(' ').replace(/\s+/g, ' ').trim();
     const fingerprint = computePassageFingerprint(candidatePassage);
 
     if (!pastFingerprints.has(fingerprint)) {
@@ -152,7 +167,6 @@ export function generateAdaptivePassage({
       };
     }
 
-    // Keep candidate in case all 10 collide (extremely rare)
     bestPassage = candidatePassage;
     bestFingerprint = fingerprint;
   }

@@ -3,16 +3,16 @@ import { generateAdaptivePassage, scoreSentenceForPatterns } from '../generator/
 import { computePassageFingerprint } from '../generator/fingerprint.js';
 
 describe('Adaptive Passage Generator', () => {
-  it('generates a well-formed, natural administrative passage', () => {
-    const result = generateAdaptivePassage({ targetCharCount: 1500 });
+  it('generates a well-formed, natural administrative passage containing at least 4,000 characters', () => {
+    const result = generateAdaptivePassage();
     
     expect(result.passage).toBeTypeOf('string');
-    expect(result.passage.length).toBeGreaterThan(1000);
+    expect(result.passage.length).toBeGreaterThanOrEqual(4000);
     expect(result.fingerprint).toBeTypeOf('string');
     expect(result.fingerprint.length).toBe(8);
 
     // Natural English formatting (capitalized sentences, ending periods, multiple sentences)
-    expect(result.passage.split('. ').length).toBeGreaterThan(3);
+    expect(result.passage.split('. ').length).toBeGreaterThan(15);
     expect(result.passage.endsWith('.')).toBe(true);
   });
 

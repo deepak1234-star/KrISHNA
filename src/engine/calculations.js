@@ -15,6 +15,9 @@
  * 3. Typing Error Percentage:
  *    Percentage of incorrect character attempts relative to total character attempts.
  *    Error % = (Mistake Count / Total Character Attempts) * 100
+ * 
+ * 4. Accuracy Percentage:
+ *    Accuracy % = 100 - Error %
  */
 
 /**
@@ -45,6 +48,49 @@ export function calculateErrorPercentage(mistakeCount, totalAttempts) {
   }
   const percentage = (mistakeCount / totalAttempts) * 100;
   return Number(percentage.toFixed(2));
+}
+
+/**
+ * Calculates accuracy percentage.
+ * Formula: Accuracy Percentage = 100 - Error Percentage
+ * @param {number} errorPercentage 
+ * @returns {number} Accuracy percentage (clamped between 0 and 100)
+ */
+export function calculateAccuracyPercentage(errorPercentage) {
+  const safeErr = Math.max(0, Number(errorPercentage) || 0);
+  const accuracy = Math.max(0, 100 - safeErr);
+  return Number(accuracy.toFixed(2));
+}
+
+/**
+ * Extracts a simple breakdown of incorrectly typed keys and their error counts.
+ * Only keys that produced errors are returned, sorted descending by error frequency.
+ * 
+ * @param {Array<object>} mistakes - Array of mistake records from mistakeTracker
+ * @returns {Array<{ key: string, count: number }>}
+ */
+export function extractIncorrectKeyBreakdown(mistakes = []) {
+  if (!Array.isArray(mistakes) || mistakes.length === 0) {
+    return [];
+  }
+
+  const counts = {};
+  for (const m of mistakes) {
+    if (!m) continue;
+    let key = m.expectedChar;
+    if (key === ' ') {
+      key = 'Space';
+    } else if (key === '\n') {
+      key = 'Enter';
+    } else if (!key) {
+      key = 'Unknown';
+    }
+    counts[key] = (counts[key] || 0) + 1;
+  }
+
+  return Object.entries(counts)
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
 }
 
 /**
