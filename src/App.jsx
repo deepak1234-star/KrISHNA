@@ -12,6 +12,7 @@ export default function App() {
   const [targetPatterns, setTargetPatterns] = useState([]);
   const [testResults, setTestResults] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [testSessionId, setTestSessionId] = useState(0);
 
   const startNewTest = async () => {
     setIsGenerating(true);
@@ -31,6 +32,7 @@ export default function App() {
 
       setCurrentPassage(generated.passage);
       setTargetPatterns(generated.targetPatterns);
+      setTestSessionId((prev) => prev + 1);
       setScreen('test');
     } catch (err) {
       console.error('Failed to generate adaptive passage:', err);
@@ -38,6 +40,7 @@ export default function App() {
       const fallback = generateAdaptivePassage();
       setCurrentPassage(fallback.passage);
       setTargetPatterns([]);
+      setTestSessionId((prev) => prev + 1);
       setScreen('test');
     } finally {
       setIsGenerating(false);
@@ -60,7 +63,7 @@ export default function App() {
 
       {screen === 'test' && (
         <TypingTest
-          key={currentPassage.substring(0, 30)} // ensures fresh instance on new passage
+          key={`test_session_${testSessionId}`} // ensures fresh instance and deadline on every new test
           passageText={currentPassage}
           targetPatterns={targetPatterns}
           onFinishTest={handleFinishTest}

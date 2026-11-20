@@ -25,8 +25,15 @@ export default function TypingTest({
   const timerRef = useRef(null);
   const isFinishedRef = useRef(false);
 
-  // Complete and save test
-  const handleTestComplete = useCallback(async () => {
+  // Keep latest callbacks/data in refs to prevent timer re-creations
+  const onFinishTestRef = useRef(onFinishTest);
+  onFinishTestRef.current = onFinishTest;
+
+  const targetPatternsRef = useRef(targetPatterns);
+  targetPatternsRef.current = targetPatterns;
+
+  // Complete and save test (guaranteed to execute at most once)
+  const handleTestComplete = useCallback(() => {
     if (isFinishedRef.current) return;
     isFinishedRef.current = true;
     setIsFinishing(true);
@@ -35,7 +42,7 @@ export default function TypingTest({
       timerRef.current.stop();
     }
 
-    const finalElapsed = timerRef.current ? timerRef.current.getElapsedSeconds() : elapsedSeconds;
+    const finalElapsed = timerRef.current ? timerRef.current.getElapsedSeconds() : 0;
     // Ensure duration is non-zero (minimum 1 second for calculations if finished immediately)
     const validElapsed = Math.max(1, finalElapsed);
     const metrics = engine.getMetrics(validElapsed);
@@ -53,29 +60,38 @@ export default function TypingTest({
     };
 
     // Immediately transition to Result Page
-    onFinishTest(metrics);
+    if (onFinishTestRef.current) {
+      onFinishTestRef.current(metrics);
+    }
 
     // Background silent save to IndexedDB without blocking UI
     saveCompletedTest({
       testSummary,
       mistakes: engine.mistakes,
       passageText: engine.passage,
-      targetPatterns
+      targetPatterns: targetPatternsRef.current
     }).catch((err) => {
       console.error('Failed to save test results to IndexedDB:', err);
     });
-  }, [engine, elapsedSeconds, onFinishTest, targetPatterns]);
+  }, [engine]);
 
-  // Initialize timestamp-based timer on mount
+  // Keep latest handleTestComplete in a ref so timer calls it without re-mounting
+  const handleTestCompleteRef = useRef(handleTestComplete);
+  handleTestCompleteRef.current = handleTestComplete;
+
+  // Initialize timestamp-based timer EXACTLY ONCE on mount
   useEffect(() => {
     const timer = new TestTimer({
       durationSeconds: TEST_DURATION_SECONDS,
+      tickIntervalMs: 250,
       onTick: (rem, elap) => {
         setRemainingSeconds(rem);
         setElapsedSeconds(elap);
       },
       onExpire: () => {
-        handleTestComplete();
+        if (handleTestCompleteRef.current) {
+          handleTestCompleteRef.current();
+        }
       }
     });
 
@@ -90,7 +106,7 @@ export default function TypingTest({
     return () => {
       timer.stop();
     };
-  }, [handleTestComplete]);
+  }, []); // Empty dependency array ensures timer runs uninterrupted across re-renders!
 
   // Auto-scroll reference passage to keep active character aligned
   useEffect(() => {

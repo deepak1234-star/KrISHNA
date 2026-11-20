@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestTimer } from '../engine/timer.js';
+import { formatTime } from '../engine/calculations.js';
 
-describe('TestTimer with Controllable Clock', () => {
-  it('starts at 15:00 (900 seconds) and tracks remaining seconds', () => {
-    let simulatedTime = 1000000;
+describe('15-Minute Countdown TestTimer', () => {
+  it('displays 15:00 initially, 14:59 after one second, and 14:00 after one minute', () => {
+    let simulatedTime = 10000000;
     const mockClock = () => simulatedTime;
 
     let latestRemaining = null;
@@ -18,26 +19,41 @@ describe('TestTimer with Controllable Clock', () => {
       }
     });
 
+    // 1. Initial start: must display 15:00 immediately
     timer.start();
-
-    // Initial state
     expect(latestRemaining).toBe(900);
     expect(latestElapsed).toBe(0);
+    expect(formatTime(latestRemaining)).toBe('15:00');
 
-    // Advance 60 seconds (1 minute)
-    simulatedTime += 60 * 1000;
+    // 2. Advance by exactly 1 second (1000ms) -> 14:59
+    simulatedTime += 1000;
+    timer.evaluate();
+    expect(latestRemaining).toBe(899);
+    expect(latestElapsed).toBe(1);
+    expect(formatTime(latestRemaining)).toBe('14:59');
+
+    // 3. Advance by another second (total 2s) -> 14:58
+    simulatedTime += 1000;
+    timer.evaluate();
+    expect(latestRemaining).toBe(898);
+    expect(latestElapsed).toBe(2);
+    expect(formatTime(latestRemaining)).toBe('14:58');
+
+    // 4. Advance to 1 minute total (60,000ms from start) -> 14:00
+    simulatedTime = 10000000 + 60 * 1000;
     timer.evaluate();
     expect(latestRemaining).toBe(840);
     expect(latestElapsed).toBe(60);
+    expect(formatTime(latestRemaining)).toBe('14:00');
 
     timer.stop();
   });
 
-  it('expires after exactly 15 minutes (900 seconds) using deadline evaluation', () => {
-    let simulatedTime = 2000000;
+  it('automatically triggers test completion at 00:00 exactly once', () => {
+    let simulatedTime = 50000000;
     const mockClock = () => simulatedTime;
 
-    let expired = false;
+    let expireCallCount = 0;
     let latestRemaining = null;
 
     const timer = new TestTimer({
@@ -47,25 +63,97 @@ describe('TestTimer with Controllable Clock', () => {
         latestRemaining = rem;
       },
       onExpire: () => {
-        expired = true;
+        expireCallCount++;
       }
     });
 
     timer.start();
-    expect(expired).toBe(false);
+    expect(expireCallCount).toBe(0);
 
-    // Advance to 14 minutes and 59 seconds (899s)
+    // Advance to 14m 59s
     simulatedTime += 899 * 1000;
     timer.evaluate();
     expect(latestRemaining).toBe(1);
-    expect(expired).toBe(false);
+    expect(formatTime(latestRemaining)).toBe('00:01');
+    expect(expireCallCount).toBe(0);
 
-    // Advance 1 more second to reach 900s (exact 15:00 deadline)
+    // Advance 1 more second to reach 15m (900s) -> 00:00
     simulatedTime += 1000;
     timer.evaluate();
     expect(latestRemaining).toBe(0);
-    expect(expired).toBe(true);
+    expect(formatTime(latestRemaining)).toBe('00:00');
+    expect(expireCallCount).toBe(1);
     expect(timer.isRunning).toBe(false);
+
+    // Extra evaluations must NOT trigger duplicate completions
+    simulatedTime += 5000;
+    timer.evaluate();
+    expect(expireCallCount).toBe(1);
+  });
+
+  it('manual early finish stops the countdown immediately with no duplicate completions', () => {
+    let simulatedTime = 30000000;
+    const mockClock = () => simulatedTime;
+
+    let expireCalled = false;
+    let tickCount = 0;
+
+    const timer = new TestTimer({
+      durationSeconds: 900,
+      clock: mockClock,
+      onTick: () => {
+        tickCount++;
+      },
+      onExpire: () => {
+        expireCalled = true;
+      }
+    });
+
+    timer.start();
+    expect(tickCount).toBe(1); // initial tick
+
+    // User finishes early at 3 minutes
+    simulatedTime += 180 * 1000;
+    timer.evaluate();
+    expect(tickCount).toBe(2);
+
+    // Candidate clicks FINISH TEST
+    timer.stop();
+    expect(timer.isRunning).toBe(false);
+
+    // Time advances past deadline
+    simulatedTime += 1000 * 1000;
+    timer.evaluate();
+
+    // Timer stopped: no more ticks and no expire callback
+    expect(tickCount).toBe(2);
+    expect(expireCalled).toBe(false);
+  });
+
+  it('handles tab visibility change immediately', () => {
+    let simulatedTime = 40000000;
+    const mockClock = () => simulatedTime;
+
+    let latestRemaining = null;
+
+    const timer = new TestTimer({
+      durationSeconds: 900,
+      clock: mockClock,
+      onTick: (rem) => {
+        latestRemaining = rem;
+      }
+    });
+
+    timer.start();
+    expect(latestRemaining).toBe(900);
+
+    // Simulate tab being inactive for 30 seconds
+    simulatedTime += 30 * 1000;
+
+    // Visibility change event fires when user focuses tab
+    timer.handleVisibilityChange();
+    expect(latestRemaining).toBe(870);
+    expect(formatTime(latestRemaining)).toBe('14:30');
 
     timer.stop();
   });

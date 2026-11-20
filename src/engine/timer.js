@@ -1,6 +1,7 @@
 /**
  * Timestamp-based Test Timer
  * Uses system clock deadlines to avoid setInterval drift.
+ * Handles tab visibility changes to prevent background throttling issues.
  * Supports controllable clock injection for automated verification.
  */
 export class TestTimer {
@@ -10,14 +11,14 @@ export class TestTimer {
    * @param {function} [options.onTick] - Called on timer updates with (remainingSeconds, elapsedSeconds)
    * @param {function} [options.onExpire] - Called when deadline is reached
    * @param {function} [options.clock] - Function returning current timestamp in ms (defaults to Date.now)
-   * @param {number} [options.tickIntervalMs=100] - Interval between tick evaluations
+   * @param {number} [options.tickIntervalMs=250] - Interval between tick evaluations
    */
   constructor({
     durationSeconds = 900,
     onTick = null,
     onExpire = null,
     clock = Date.now,
-    tickIntervalMs = 100
+    tickIntervalMs = 250
   } = {}) {
     this.durationSeconds = durationSeconds;
     this.durationMs = durationSeconds * 1000;
@@ -32,6 +33,7 @@ export class TestTimer {
     this.isRunning = false;
     this.isExpired = false;
     this.elapsedSeconds = 0;
+    this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
   }
 
   start() {
@@ -42,23 +44,36 @@ export class TestTimer {
     this.isRunning = true;
     this.isExpired = false;
 
-    // Trigger initial tick
+    // Listen for tab switching so inactive tabs update immediately upon becoming visible
+    if (typeof document !== 'undefined' && document.addEventListener) {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+
+    // Trigger initial tick immediately (at 0 elapsed, 15:00 remaining)
     this.evaluate();
 
-    // Start tick interval
+    // Start evaluation interval
     this.intervalId = setInterval(() => {
       this.evaluate();
     }, this.tickIntervalMs);
+  }
+
+  handleVisibilityChange() {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      this.evaluate();
+    }
   }
 
   evaluate() {
     if (!this.isRunning) return;
 
     const now = this.clock();
+    // Absolute deadline comparison
     const remainingMs = Math.max(0, this.deadline - now);
     const elapsedMs = Math.max(0, now - this.startTime);
 
     this.elapsedSeconds = Math.min(this.durationSeconds, Math.floor(elapsedMs / 1000));
+    // Ceil ensures that 899,999ms is treated as 900s, and exactly at 1000ms elapsed it becomes 899s
     const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
 
     if (this.onTick) {
@@ -79,6 +94,9 @@ export class TestTimer {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (typeof document !== 'undefined' && document.removeEventListener) {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     }
   }
 
