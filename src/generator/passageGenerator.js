@@ -135,13 +135,13 @@ export function generateAdaptivePassage({
         paragraphs.push(selected.join(' '));
       }
 
-      currentLength = paragraphs.join('\n\n').length;
+      currentLength = paragraphs.join(' ').length;
       if (currentLength >= targetCharCount) {
         break;
       }
     }
 
-    const candidatePassage = paragraphs.join('\n\n');
+    const candidatePassage = paragraphs.join(' ').replace(/\s+/g, ' ').trim();
     const fingerprint = computePassageFingerprint(candidatePassage);
 
     if (!pastFingerprints.has(fingerprint)) {

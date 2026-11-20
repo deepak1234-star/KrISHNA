@@ -66,6 +66,11 @@ export function isTypingKey(event) {
     return true;
   }
 
+  // Enter key
+  if (event.key === 'Enter') {
+    return true;
+  }
+
   // Single printable characters (letters, numbers, space, punctuation)
   if (event.key.length === 1) {
     return true;

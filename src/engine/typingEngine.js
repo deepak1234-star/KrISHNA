@@ -39,6 +39,33 @@ export class TypingEngine {
       return { handled: true, completed: false };
     }
 
+    if (event.key === 'Enter') {
+      const position = this.typed.length;
+      if (position >= this.passage.length) {
+        return { handled: true, completed: true };
+      }
+
+      this.totalKeyDepressions++;
+      this.totalCharacterAttempts++;
+
+      const expectedChar = this.passage[position];
+      const typedChar = expectedChar === '\n' ? '\n' : ' ';
+
+      if (typedChar !== expectedChar) {
+        const mistakeRecord = createMistakeRecord({
+          passage: this.passage,
+          position,
+          typedChar,
+          testId: this.testId
+        });
+        this.mistakes.push(mistakeRecord);
+      }
+
+      this.typed += typedChar;
+      const isCompleted = this.typed.length >= this.passage.length;
+      return { handled: true, completed: isCompleted };
+    }
+
     if (event.key.length === 1) {
       const position = this.typed.length;
 

@@ -11,8 +11,8 @@ describe('Adaptive Passage Generator', () => {
     expect(result.fingerprint).toBeTypeOf('string');
     expect(result.fingerprint.length).toBe(8);
 
-    // Natural English formatting (capitalized sentences, ending periods, paragraph breaks)
-    expect(result.passage).toContain('\n\n');
+    // Natural English formatting (capitalized sentences, ending periods, multiple sentences)
+    expect(result.passage.split('. ').length).toBeGreaterThan(3);
     expect(result.passage.endsWith('.')).toBe(true);
   });
 

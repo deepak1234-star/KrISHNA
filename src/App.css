@@ -168,7 +168,8 @@
   line-height: 2.1;
   letter-spacing: 0.5px;
   position: relative;
-  scroll-behavior: smooth;
+  white-space: pre-wrap;
+  word-break: break-word;
   user-select: none;
 }
 
@@ -202,6 +203,11 @@
 .char-space {
   display: inline-block;
   min-width: 0.6em;
+}
+
+.char-space.char-current {
+  background-color: #bfdbfe;
+  border-bottom: 3px solid #2563eb;
 }
 
 .char-space.char-incorrect {
@@ -405,4 +411,91 @@
   color: #ffffff;
   border-radius: 4px;
   font-weight: 600;
+}
+
+/* Responsive design for tablets and mobile devices */
+@media (max-width: 640px) {
+  .home-title {
+    font-size: 1.75rem;
+  }
+
+  .home-subtitle {
+    font-size: 1rem;
+  }
+
+  .btn-start-test {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+  }
+
+  .test-page {
+    padding: 0.75rem 1rem;
+  }
+
+  .exam-banner h1 {
+    font-size: 0.95rem;
+  }
+
+  .exam-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .metrics-bar {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .metric-card {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .metric-label {
+    font-size: 0.65rem;
+  }
+
+  .metric-value {
+    font-size: 1.15rem;
+  }
+
+  .passage-display-box {
+    height: 140px;
+    font-size: 1rem;
+    line-height: 1.8;
+    padding: 0.75rem;
+  }
+
+  .typing-input {
+    height: 100px;
+    font-size: 1rem;
+    padding: 0.75rem;
+  }
+
+  .focus-notice {
+    font-size: 0.75rem;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .result-card {
+    padding: 1.5rem 1rem;
+  }
+
+  .result-title {
+    font-size: 1.3rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .result-stat-row {
+    padding: 0.75rem 1rem;
+  }
+
+  .result-stat-label {
+    font-size: 0.85rem;
+  }
+
+  .result-stat-value {
+    font-size: 1.2rem;
+  }
 }

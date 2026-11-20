@@ -52,19 +52,18 @@ export default function TypingTest({
       totalAttempts: engine.totalCharacterAttempts
     };
 
-    try {
-      // Background silent save to IndexedDB
-      await saveCompletedTest({
-        testSummary,
-        mistakes: engine.mistakes,
-        passageText: engine.passage,
-        targetPatterns
-      });
-    } catch (err) {
-      console.error('Failed to save test results to IndexedDB:', err);
-    }
-
+    // Immediately transition to Result Page
     onFinishTest(metrics);
+
+    // Background silent save to IndexedDB without blocking UI
+    saveCompletedTest({
+      testSummary,
+      mistakes: engine.mistakes,
+      passageText: engine.passage,
+      targetPatterns
+    }).catch((err) => {
+      console.error('Failed to save test results to IndexedDB:', err);
+    });
   }, [engine, elapsedSeconds, onFinishTest, targetPatterns]);
 
   // Initialize timestamp-based timer on mount
@@ -107,13 +106,26 @@ export default function TypingTest({
       if (typeof box.scrollTo === 'function') {
         box.scrollTo({
           top: targetScroll,
-          behavior: 'smooth'
+          behavior: 'auto'
         });
       } else {
         box.scrollTop = targetScroll;
       }
     }
   }, [typedLength]);
+
+  // Window-level key capture: if user presses any key while outside textarea, auto-focus textarea
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (showConfirmModal || isFinishing || isFinishedRef.current) return;
+      if (document.activeElement !== inputRef.current && inputRef.current) {
+        inputRef.current.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [showConfirmModal, isFinishing]);
 
   // Handle key input
   const handleKeyDown = (e) => {
@@ -139,6 +151,33 @@ export default function TypingTest({
       if (completed) {
         handleTestComplete();
       }
+    }
+  };
+
+  // Support mobile virtual / soft keyboards (which emit input/change events)
+  const handleInputChange = (e) => {
+    if (isFinishing || isFinishedRef.current) return;
+    const newVal = e.target.value;
+    const currentLen = engine.typed.length;
+
+    if (newVal.length > currentLen) {
+      const added = newVal.slice(currentLen);
+      for (const char of added) {
+        const { completed } = engine.handleKeyDown({ key: char });
+        if (completed) {
+          handleTestComplete();
+          break;
+        }
+      }
+      setTypedLength(engine.typed.length);
+      setKeyDepressions(engine.totalKeyDepressions);
+    } else if (newVal.length < currentLen) {
+      const diff = currentLen - newVal.length;
+      for (let i = 0; i < diff; i++) {
+        engine.handleKeyDown({ key: 'Backspace' });
+      }
+      setTypedLength(engine.typed.length);
+      setKeyDepressions(engine.totalKeyDepressions);
     }
   };
 
@@ -221,7 +260,7 @@ export default function TypingTest({
             className="typing-input"
             value={engine.typed}
             onKeyDown={handleKeyDown}
-            onChange={() => {}} // Fully controlled through onKeyDown
+            onChange={handleInputChange}
             onPaste={(e) => e.preventDefault()}
             onDrop={(e) => e.preventDefault()}
             spellCheck="false"
