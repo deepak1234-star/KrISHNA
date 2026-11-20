@@ -9,7 +9,13 @@ describe('App End-to-End User Flow Integration', () => {
     render(<App />);
 
     // 1. Verify Home Page
-    const startBtn = screen.getByRole('button', { name: /START TEST/i });
+    expect(screen.getByText('Select Test Duration')).toBeDefined();
+    expect(screen.getByRole('button', { name: /^5 Minutes$/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^10 Minutes$/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^15 Minutes$/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^30 Minutes$/i })).toBeDefined();
+
+    const startBtn = screen.getByRole('button', { name: /START 15-MINUTE TEST/i });
     expect(startBtn).toBeDefined();
     expect(screen.getByText('SSC CGL DEST Typing Practice')).toBeDefined();
     expect(screen.queryByRole('navigation')).toBeNull(); // No navigation menu
@@ -23,7 +29,7 @@ describe('App End-to-End User Flow Integration', () => {
     // 3. Verify Typing Test Screen renders asynchronously
     const examHeader = await screen.findByText(/Staff Selection Commission - DEST/i);
     expect(examHeader).toBeDefined();
-    expect(screen.getByText('Ready — Starts on First Keypress')).toBeDefined();
+    expect(screen.getByText('Ready — 15 Mins (Starts on First Keypress)')).toBeDefined();
     expect(screen.getByText('15:00')).toBeDefined(); // Timer starts at 15:00
     expect(screen.getByText('Total Key Depressions')).toBeDefined();
     // Typing Progress card must be REMOVED as requested
@@ -52,7 +58,7 @@ describe('App End-to-End User Flow Integration', () => {
 
     expect(chars[0].className).toContain('char-correct');
     expect(chars[1].className).toContain('char-current');
-    expect(screen.getByText('Test in Progress')).toBeDefined();
+    expect(screen.getByText('Test in Progress (15 Min)')).toBeDefined();
 
     // Type an intentionally incorrect character for the second position
     const wrongChar = chars[1].textContent === 'z' ? 'y' : 'z';
@@ -123,5 +129,41 @@ describe('App End-to-End User Flow Integration', () => {
     const nextExamHeader = await screen.findByText(/Staff Selection Commission - DEST/i);
     expect(nextExamHeader).toBeDefined();
     expect(screen.getByText('15:00')).toBeDefined();
+  });
+
+  it('allows candidate to select 5, 10, 15, or 30 minutes duration', async () => {
+    render(<App />);
+
+    const fiveMinBtn = screen.getByRole('button', { name: /^5 Minutes$/i });
+    const tenMinBtn = screen.getByRole('button', { name: /^10 Minutes$/i });
+    const thirtyMinBtn = screen.getByRole('button', { name: /^30 Minutes$/i });
+
+    // Click 5 Minutes
+    await act(async () => {
+      fireEvent.click(fiveMinBtn);
+    });
+    expect(screen.getByRole('button', { name: /START 5-MINUTE TEST/i })).toBeDefined();
+
+    // Click 30 Minutes
+    await act(async () => {
+      fireEvent.click(thirtyMinBtn);
+    });
+    expect(screen.getByRole('button', { name: /START 30-MINUTE TEST/i })).toBeDefined();
+
+    // Click 10 Minutes
+    await act(async () => {
+      fireEvent.click(tenMinBtn);
+    });
+    const start10Btn = screen.getByRole('button', { name: /START 10-MINUTE TEST/i });
+    expect(start10Btn).toBeDefined();
+
+    // Start 10-minute test
+    await act(async () => {
+      fireEvent.click(start10Btn);
+    });
+
+    // Check timer and badge
+    expect(await screen.findByText('10:00')).toBeDefined();
+    expect(screen.getByText('Ready — 10 Mins (Starts on First Keypress)')).toBeDefined();
   });
 });

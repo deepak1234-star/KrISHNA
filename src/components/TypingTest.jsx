@@ -9,17 +9,19 @@ import {
 } from '../engine/calculations.js';
 import { saveCompletedTest } from '../storage/mistakeRepository.js';
 
-const TEST_DURATION_SECONDS = 900; // 15 Minutes exactly
+const DEFAULT_DURATION_SECONDS = 900; // 15 Minutes fallback
 
 export default function TypingTest({
   passageText,
   targetPatterns = [],
+  durationMinutes = 15,
   onFinishTest
 }) {
+  const durationSeconds = (Number(durationMinutes) || 15) * 60;
   const [engine] = useState(() => new TypingEngine({ passage: passageText }));
   const [typedLength, setTypedLength] = useState(0);
   const [keyDepressions, setKeyDepressions] = useState(0);
-  const [remainingSeconds, setRemainingSeconds] = useState(TEST_DURATION_SECONDS);
+  const [remainingSeconds, setRemainingSeconds] = useState(durationSeconds);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
@@ -110,7 +112,7 @@ export default function TypingTest({
   // Initialize timestamp-based timer EXACTLY ONCE on mount
   useEffect(() => {
     const timer = new TestTimer({
-      durationSeconds: TEST_DURATION_SECONDS,
+      durationSeconds,
       tickIntervalMs: 250,
       onTick: (rem, elap) => {
         setRemainingSeconds(rem);
@@ -134,7 +136,7 @@ export default function TypingTest({
     return () => {
       timer.stop();
     };
-  }, []); // Empty dependency array ensures timer runs uninterrupted across re-renders!
+  }, [durationSeconds]); // Fresh timer instance if durationSeconds changes
 
   // Auto-scroll reference passage stably when line changes
   useEffect(() => {
@@ -247,7 +249,7 @@ export default function TypingTest({
       <div className="exam-banner">
         <h1>Staff Selection Commission - DEST</h1>
         <span className="exam-badge">
-          {hasStarted ? 'Test in Progress' : 'Ready — Starts on First Keypress'}
+          {hasStarted ? `Test in Progress (${durationMinutes} Min)` : `Ready — ${durationMinutes} Mins (Starts on First Keypress)`}
         </span>
       </div>
 
