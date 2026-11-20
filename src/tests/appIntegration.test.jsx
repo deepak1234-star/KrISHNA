@@ -23,6 +23,7 @@ describe('App End-to-End User Flow Integration', () => {
     // 3. Verify Typing Test Screen renders asynchronously
     const examHeader = await screen.findByText(/Staff Selection Commission - DEST/i);
     expect(examHeader).toBeDefined();
+    expect(screen.getByText('Ready — Starts on First Keypress')).toBeDefined();
     expect(screen.getByText('15:00')).toBeDefined(); // Timer starts at 15:00
     expect(screen.getByText('Total Key Depressions')).toBeDefined();
     expect(screen.getByText('Typing Progress')).toBeDefined();
@@ -50,6 +51,7 @@ describe('App End-to-End User Flow Integration', () => {
 
     expect(chars[0].className).toContain('char-correct');
     expect(chars[1].className).toContain('char-current');
+    expect(screen.getByText('Test in Progress')).toBeDefined();
 
     // Type an intentionally incorrect character for the second position
     const wrongChar = chars[1].textContent === 'z' ? 'y' : 'z';

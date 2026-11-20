@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TypingEngine } from '../engine/typingEngine.js';
 import { TestTimer } from '../engine/timer.js';
-import { formatTime } from '../engine/calculations.js';
+import { formatTime, isTypingKey } from '../engine/calculations.js';
 import { saveCompletedTest } from '../storage/mistakeRepository.js';
 
 const TEST_DURATION_SECONDS = 900; // 15 Minutes exactly
@@ -18,12 +18,25 @@ export default function TypingTest({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const passageBoxRef = useRef(null);
   const activeCharRef = useRef(null);
   const inputRef = useRef(null);
   const timerRef = useRef(null);
   const isFinishedRef = useRef(false);
+  const hasStartedRef = useRef(false);
+
+  // Starts the countdown timer on candidate's first typing action
+  const startTimerIfNeeded = useCallback(() => {
+    if (!hasStartedRef.current && !isFinishedRef.current) {
+      hasStartedRef.current = true;
+      setHasStarted(true);
+      if (timerRef.current && !timerRef.current.isRunning) {
+        timerRef.current.start();
+      }
+    }
+  }, []);
 
   // Keep latest callbacks/data in refs to prevent timer re-creations
   const onFinishTestRef = useRef(onFinishTest);
@@ -96,7 +109,7 @@ export default function TypingTest({
     });
 
     timerRef.current = timer;
-    timer.start();
+    // Timer will be started as soon as candidate presses the first typing key!
 
     // Auto-focus typing input
     if (inputRef.current) {
@@ -158,6 +171,11 @@ export default function TypingTest({
       return;
     }
 
+    // Start timer on candidate's very first valid typing keypress
+    if (isTypingKey(e)) {
+      startTimerIfNeeded();
+    }
+
     const { handled, completed } = engine.handleKeyDown(e);
     if (handled) {
       e.preventDefault();
@@ -173,6 +191,7 @@ export default function TypingTest({
   // Support mobile virtual / soft keyboards (which emit input/change events)
   const handleInputChange = (e) => {
     if (isFinishing || isFinishedRef.current) return;
+    startTimerIfNeeded();
     const newVal = e.target.value;
     const currentLen = engine.typed.length;
 
@@ -213,7 +232,9 @@ export default function TypingTest({
       {/* SSC CGL Exam Header */}
       <div className="exam-banner">
         <h1>Staff Selection Commission - DEST</h1>
-        <span className="exam-badge">Duration: 15 Minutes</span>
+        <span className="exam-badge">
+          {hasStarted ? 'Test in Progress' : 'Ready — Starts on First Keypress'}
+        </span>
       </div>
 
       {/* Top Metrics Section */}
@@ -283,10 +304,18 @@ export default function TypingTest({
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
-            placeholder="Click here and begin typing the passage above..."
+            placeholder={
+              hasStarted
+                ? "Continue typing the passage..."
+                : "Click here and start typing... (Timer begins on your first keypress)"
+            }
           />
           <div className="focus-notice">
-            <span>Keep your eyes on the reference text. Backspace is enabled for corrections.</span>
+            <span>
+              {hasStarted
+                ? "Keep your eyes on the reference text. Backspace is enabled for corrections."
+                : "Timer will start automatically as soon as you type the first character."}
+            </span>
             <span>Characters typed: {typedLength} / {engine.passage.length}</span>
           </div>
         </div>
